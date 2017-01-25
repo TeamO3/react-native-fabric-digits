@@ -24,7 +24,9 @@ import com.twitter.sdk.android.core.TwitterAuthConfig;
 import com.twitter.sdk.android.core.TwitterAuthToken;
 import com.twitter.sdk.android.core.TwitterCore;
 
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import io.fabric.sdk.android.Fabric;
 
@@ -42,6 +44,24 @@ public class DigitsManager extends ReactContextBaseJavaModule implements Lifecyc
 
     public DigitsManager(ReactApplicationContext reactContext) {
         super(reactContext);
+    }
+
+    private static void logoutFabricDigits(){
+        try {
+            Map<Long, DigitsSession> digitsSessionMap = Digits.getSessionManager().getSessionMap();
+            if(digitsSessionMap != null){
+                Set<Long> digitIdSet = new HashSet<>(digitsSessionMap.keySet());
+                for(Long digitId : digitIdSet){
+                    DigitsSession digitsSession = digitsSessionMap.get(digitId);
+                    if(digitsSession != null){
+                        Digits.getSessionManager().clearSession(digitsSession.getId());
+                    }
+                }
+            }
+            Digits.getSessionManager().clearActiveSession();
+        } catch (Exception e) {
+            Log.e(TAG, "error clearing sessions", e);
+        }
     }
 
     @Override
@@ -79,7 +99,7 @@ public class DigitsManager extends ReactContextBaseJavaModule implements Lifecyc
 
     @ReactMethod
     public void logout() {
-        Digits.getSessionManager().clearActiveSession();
+        logoutFabricDigits();
     }
 
     @ReactMethod
@@ -123,19 +143,23 @@ public class DigitsManager extends ReactContextBaseJavaModule implements Lifecyc
 
     @Override
     public void success(DigitsSession session, String phoneNumber) {
+        Log.d(TAG, "success: " + session + " " + phoneNumber);
         digitsSession = session;
         invokePromise();
     }
 
     @Override
     public void failure(DigitsException exception) {
+        Log.e(TAG, "failure:", exception);
         digitsException = exception;
     }
 
     @Override
     public void onHostResume() {
         paused = false;
-        invokePromise();
+        if (digitsException != null || digitsSession != null) {
+            invokePromise();
+        }
     }
 
     @Override
